@@ -8,18 +8,140 @@ output:
 
 ## Loading and preprocessing the data
 
+### Unzipping and reading in data
 
+```{r}
+# path to directory where zipfile  activity.zip  is
+# needs to be changed to your local situation.
+setwd("~/05_Reproducible_Research/RepData_PeerAssessment1")
+
+# unzipping and putting the data into a data.frame
+unzip("activity.zip")
+read.csv("activity.csv") -> data
+```
+If the unzip instruction causes problems on your machine (it is operating system dependent). Unzip by hand and skip the unzip instruction in the code.
+
+### What is the data about?
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.  
+Looking into the data.frame first 3 and last 3 rows:
+
+```{r, echo=TRUE}
+head(data,3)
+tail(data,3)
+```
+From the rownumbers shown in the output we see there are `r nrow(data)` rows.  
+We expect, with one measurement every 5 minutes:  ((31 +30) * 24 * 60 ) / 5 = `r as.integer(((31 +30) * 24 * 60 ) / 5)`
+
+We will deal later with the NA (not available) values in the steps column.
+
+### Adding some columns to the data.frame
+
+For making plots the interval column is not nice, the points are not equidistant. From 535 to the next point 540 is 5 units, from 555 to the next point 600 is 45 units. It is composed off the 
+hour * 100 + minutes counted from the whole hour.
+
+We decompose it to added columns "hour" an "minute". These two are combined to get a nice equidistant scale "time". The + 2.5 in the expression is because the middle of the interval is a more precise representation as the beginning.
+
+```{r}
+data.frame(data, hour = as.integer(floor(data$interval/100))) -> data
+data.frame(data, minute = as.integer(data$interval - data$hour * 100)) -> data
+data.frame(data, time = data$hour + (data$minute + 2.5)/60) -> data
+```
+See the result
+```{r}
+head(data,3)
+tail(data,3)
+```
 
 ## What is mean total number of steps taken per day?
 
+First the sum of all intervals and the count of intervals with without NA's is calculated. See code below.
+```{r}
+na.omit(data) -> data2
+unique(data2$date) -> dates
+data.frame(date = dates , stepstotal = numeric(length(dates)),
+            intervals = numeric(length(dates))) -> datapd
+for( d in dates)  {
+   sum(data2$steps[data2$date == d]) ->  datapd$stepstotal[datapd$date == d]
+   length(data2$steps[data2$date == d]) ->  datapd$intervals[datapd$date == d]
+}
+datapd
+```
+
+There are `r length(unique(data$date))- length(unique(data2$date))` days with only NA values for all intervals.
+
+There are `r sum(data2$intervals != 288)` days with NA values in some of the intervals.
+
+```{r , fig.height=4}
+hist(datapd$stepstotal, main="Histogram of total of steps per day", xlab="Steps in one day")
+```
+
+The mean steps per day in this period was:
+
+```{r}
+mean(datapd$stepstotal)
+```
+
+The median steps per day in this period was:
+
+```{r}
+median(datapd$stepstotal)
+```
 
 
 ## What is the average daily activity pattern?
 
+```{r}
+na.omit(data) -> data2
+unique(data2$time) -> times
+data.frame(time = times , stepstotal = numeric(length(times)),
+            intervals = numeric(length(times))) -> datapt
+for( t in times)  {
+   sum(data2$steps[data2$time == t]) ->  datapt$stepstotal[datapt$time == t]
+   length(data2$steps[data2$time == t]) ->  datapt$intervals[datapt$time == t]
+}
+data.frame(datapt, stepsmeaninterval = datapt$stepstotal/datapt$intervals) -> datapt
 
+```
+
+
+```{r , fig.height=6}
+plot(datapt$time, datapt$stepsmeaninterval, type="l",
+     main="How many steps in five minutes on an average day",
+     xlab="Time of the day (military coded 0 to 24)",
+     ylab="Steps in 5 minute time interval")
+```
 
 ## Imputing missing values
+
+We add a column to the dataframe data with the name "steps2"
+If column steps has a NA we take the dayly averaged value for that interval in steps2.
+
+```{r}
+data.frame(data, steps2=data$steps) -> data
+ifelse(is.na(data$steps), 
+       round(datapt$stepsmeaninterval[datapt$time==data$time],0) , 
+       data$steps) -> data$steps2
+```
 
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+We add a factor column "typeday" with values weekday or weekend.
+See code below:
+```{r}
+as.POSIXlt(data$date)$wday -> temp
+ifelse(temp ==0 | temp == 6, "weekend", "weekday") -> temp
+as.factor(temp) -> temp
+data.frame(data, typeday=temp) -> data
+```
+
+Look if it worked:
+
+```{r}
+head(data)
+tail(data)
+```
+
+RUN OUT OF TIME
